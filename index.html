@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zain Tariq · Project studio</title>
+<style>
+  body { margin: 0; font-family: Georgia, serif; background: #f6f3ec; color: #1c1915; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-weight: 500; font-size: 2rem; margin: 0 0 8px; }
+  p.lead { margin: 0 0 28px; line-height: 1.45; }
+  form, article { background: #fff; border: 1px solid #e4ddd0; padding: 16px; margin: 0 0 16px; }
+  label { display: block; font-size: 0.85rem; margin-bottom: 6px; }
+  textarea, select { width: 100%; box-sizing: border-box; font: 16px/1.4 Georgia, serif; padding: 8px; }
+  button { margin-top: 10px; background: #1c1915; color: #fff; border: 0; padding: 8px 14px; font: 15px Georgia, serif; }
+  .status { min-height: 1.2em; }
+  a { color: #1f4e79; }
+  li { margin: 0 0 12px; }
+  small { color: #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Project studio</h1>
+  <p class="lead">Type a project. This creates a public repository on your GitHub account and commits a small program that states the idea. When that exists, ask for the next improvement and it is committed on top.</p>
+  <form id="idea">
+    <label for="idea-text">New project</label>
+    <textarea id="idea-text" rows="4" placeholder="A command line tool that checks whether a URL is up and writes the result to a log."></textarea>
+    <button type="submit">Create repository</button>
+    <p class="status" id="idea-status"></p>
+  </form>
+  <form id="improve">
+    <label for="repo">Improve an existing repository</label>
+    <select id="repo"></select>
+    <textarea id="note" rows="3" placeholder="Add a retry when the check fails, and record how many attempts it took."></textarea>
+    <button type="submit">Commit improvement</button>
+    <p class="status" id="improve-status"></p>
+  </form>
+  <article>
+    <h2>What is on GitHub</h2>
+    <ul id="list"><li>Loading…</li></ul>
+  </article>
+</main>
+<script>
+const list = document.querySelector('#list');
+const repoSelect = document.querySelector('#repo');
+
+async function load() {
+  const data = await fetch('/api/activity').then((r) => r.json());
+  if (data.error) {
+    list.innerHTML = `<li>${data.error}</li>`;
+    return;
+  }
+  repoSelect.innerHTML = data.repos.map((repo) => `<option value="${repo.name}">${repo.name}</option>`).join('');
+  list.innerHTML = data.repos.map((repo) => {
+    const commits = (repo.commits || []).map((commit) => `<div><small>${commit.sha} · ${commit.message.split('\\n')[0]}</small></div>`).join('');
+    return `<li><a href="${repo.url}">${repo.name}</a><div>${repo.description || ''}</div>${commits}</li>`;
+  }).join('') || '<li>No repositories yet.</li>';
+}
+
+document.querySelector('#idea').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = document.querySelector('#idea-status');
+  status.textContent = 'Creating the repository and the first commit…';
+  const response = await fetch('/api/idea', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ idea: document.querySelector('#idea-text').value }),
+  });
+  const data = await response.json();
+  status.textContent = data.error || `Created ${data.url}`;
+  if (!data.error) load();
+});
+
+document.querySelector('#improve').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = document.querySelector('#improve-status');
+  status.textContent = 'Committing the improvement…';
+  const response = await fetch('/api/improve', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      repo: document.querySelector('#repo').value,
+      note: document.querySelector('#note').value,
+    }),
+  });
+  const data = await response.json();
+  status.textContent = data.error || `Updated ${data.url}`;
+  if (!data.error) load();
+});
+
+load();
+</script>
+</body>
+</html>
